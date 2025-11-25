@@ -1,0 +1,13 @@
+/.env
+/data
+.env.local
+.env.*
+/.venv
+node_modules/
+*.log
+.DS_Store
+traefik/acme/
+*.sqlite
+*.db
+/.cache
+/.pytest_cache

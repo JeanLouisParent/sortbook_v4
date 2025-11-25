@@ -1,0 +1,6 @@
+# Exemple simple de workflow pour Windmill (stocké en texte pour versionner)
+
+# Action: list EPUB files in EPUB_ROOT
+list_epubs:
+  type: shell
+  cmd: "ls -1 /epub_root || true"

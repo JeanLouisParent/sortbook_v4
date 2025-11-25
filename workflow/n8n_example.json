@@ -1,0 +1,11 @@
+{
+  "name": "Example n8n workflow",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Start",
+      "type": "n8n-nodes-base.start"
+    }
+  ],
+  "active": false
+}
