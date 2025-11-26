@@ -1,10 +1,2 @@
-/data
-/.venv
-node_modules/
-*.log
-.DS_Store
-traefik/acme/
-*.sqlite
-*.db
-/.cache
-/.pytest_cache
+/data/
+/.env

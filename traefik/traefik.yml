@@ -1,11 +1,19 @@
 entryPoints:
+  # HTTP public
   web:
     address: ":80"
+  # HTTPS public (certificat autosigné local)
   websecure:
     address: ":443"
+  # Dashboard / API Traefik
+  traefik:
+    address: ":8080"
+
 api:
   dashboard: true
+
 providers:
-  docker:
-    endpoint: "unix:///var/run/docker.sock"
-    exposedByDefault: false
+  # Configuration HTTP(s) dynamique (routers / services)
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true

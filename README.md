@@ -1,53 +1,131 @@
-# Sortbook - composition Dockerisée
+# Edoras local stack (Traefik + n8n + Windmill + Flowise)
 
-Ce dépôt fournit un scaffolding Docker Compose pour lancer :
-- `traefik` (reverse-proxy)
-- un conteneur `sqlite` (simple service qui assure la présence d'un fichier `/data/sqlite.db`)
-- `n8n` (workflow)
-- `flowise` (visual flow builder)
-- `windmill` (automation)
+Ce repo contient une stack Docker locale pour :
+- exposer plusieurs services via Traefik ;
+- partager une bibliothèque d'EPUB ;
+- consommer une instance Ollama distante.
 
-Caractéristiques principales :
-- Tous les conteneurs montent `/data` (chemin racine du système hôte) et montent également la variable `EPUB_ROOT` définie dans `.env` en `/epub_root`.
-- Les workflows `n8n` et `windmill` peuvent être versionnés dans le dossier `workflow/`.
-- Traefik sert les services via des règles basées sur le chemin :
-  - `http://<IP-DU-SERVEUR>/n8n` → n8n
-  - `http://<IP-DU-SERVEUR>/flowise` → Flowise
-  - `http://<IP-DU-SERVEUR>/windmill` → Windmill
+## Services
 
-Fichiers clés :
-- `docker-compose.yml` : orchestration
-- `traefik/traefik.yml` : config statique Traefik
-- `services/sqlite/Dockerfile` : conteneur SQLite minimal
-- `workflow/` : emplacement pour stocker les workflows en texte
+- Traefik (reverse proxy + dashboard)
+  - Dashboard : `http://edoras.local:8080/dashboard/`
+- n8n : `https://n8n.edoras.local`
+- Windmill : `https://windmill.edoras.local`
+- Flowise : `https://flowise.edoras.local`
 
-Variables d'environnement (fichier `.env`) :
-- `EPUB_ROOT` : dossier racine des EPUBs (monté dans chaque conteneur)
-- `EPUB_DEST` : dossier de sortie (utilisé par vos scripts internes)
-- `LOG_DIR` : dossier de logs à l'intérieur des conteneurs
-- `OLLAMA_URL` : URL du serveur Ollama (tourne sur une autre machine)
+Tous les services passent par Traefik en HTTPS avec un certificat autosigné.
 
-Lancement
+## Pré-requis
 
-1. Créez `/data` à la racine si ce n'est pas déjà fait et donnez les permissions nécessaires (sur macOS parfois sudo sera requis) :
+- Docker / Docker Desktop
+- Fichier `.env` rempli (voir plus bas)
+- Accès réseau à l’instance Ollama distante :
+  - IP : `192.168.1.49`
+  - Port : `11434`
 
-```bash
-sudo mkdir -p /data
-sudo chown $USER:staff /data
+## Fichier `.env`
+
+Variables principales utilisées par `docker-compose.yml` :
+
+```env
+DOMAIN_NAME=edoras.local
+SUBDOMAIN=n8n
+GENERIC_TIMEZONE=Europe/Paris
+
+# Windmill
+WM_IMAGE=ghcr.io/windmill-labs/windmill:latest
+WINDMILL_DB_PASSWORD=changeme
+DATABASE_URL=postgres://windmill:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+
+# Flowise
+FLOWISE_PASSWORD=changeme
+FLOWISE_SECRETKEY=supersecret
+
+# Librairie EPUB (dossier physique sur la machine hôte)
+EPUB_ROOT=G:\Livres bruts
+
+# Ollama distant
+OLLAMA_URL=http://192.168.1.49:11434
 ```
 
-2. Vérifiez et adaptez `.env` si nécessaire (chemins Windows fournis par défaut comme exemple).
+Adapte `EPUB_ROOT` et les mots de passe à ton environnement.
 
-3. Démarrer les services :
+## Résolution DNS locale (fichier hosts)
+
+Sur chaque machine cliente (Mac, Linux, Windows), tu dois faire pointer les sous-domaines vers l’IP de la machine Docker (par ex. `192.168.1.56`).
+
+Exemple sur macOS / Linux (`/etc/hosts`) :
+
+```bash
+sudo sh -c "echo '\n# Edoras hosts\n192.168.1.56 edoras.local n8n.edoras.local flowise.edoras.local windmill.edoras.local' >> /etc/hosts"
+```
+
+Exemple sur Windows (`C:\Windows\System32\drivers\etc\hosts`, éditeur en admin) :
+
+```text
+192.168.1.56 edoras.local n8n.edoras.local flowise.edoras.local windmill.edoras.local
+```
+
+Remplace `192.168.1.56` par l’IP locale réelle de la machine qui exécute Docker.
+
+## Volumes et données
+
+Toutes les données persistantes sont stockées dans le dossier `./data` du repo :
+
+- n8n : `./data/n8n`, `./data/local-files`
+- Windmill :
+  - DB Postgres : `./data/windmill/db`
+  - logs / cache worker : `./data/windmill/worker_logs`, `./data/windmill/worker_cache`
+- Flowise :
+  - DB Mongo : `./data/flowise/db`
+
+Ce dossier est ignoré par Git (voir `.gitignore`) pour éviter de committer des fichiers volumineux.
+
+La bibliothèque d’EPUB (`EPUB_ROOT`) est montée en lecture seule dans tous les conteneurs sur `/epub`.
+
+## Ollama
+
+Les services n8n et Flowise reçoivent `OLLAMA_URL` en variable d’environnement.  
+L’URL par défaut est :
+
+- `http://192.168.1.49:11434`
+
+Tu peux l’adapter dans `.env` si ton instance Ollama change d’IP ou de port.
+
+## Traefik
+
+Configuration principale :
+
+- `traefik/traefik.yml` : entrypoints, provider file, dashboard.
+- `traefik/dynamic.yml` : routers / services / TLS :
+  - `n8n.edoras.local` → `sortbook_n8n:5678`
+  - `windmill.edoras.local` → `sortbook_windmill_server:8000`
+  - `flowise.edoras.local` → `sortbook_flowise:3000`
+  - certificat autosigné `traefik/certs/edoras.local.{crt,key}` monté dans le conteneur.
+
+## Démarrage
+
+Depuis la racine du repo :
 
 ```bash
 docker compose up -d
 ```
 
-4. Accéder depuis un autre poste de votre réseau local :
-- Ouvrez `http://<IP-DU-SERVEUR>/n8n` ou `/flowise` ou `/windmill` selon le service.
+Puis, depuis une machine cliente avec le `hosts` configuré :
 
-Notes & conseils
-- Les images `windmillio/windmill:latest` et `flowiseai/flowise:latest` sont référencées comme exemples ; si vos images officielles diffèrent, modifiez `docker-compose.yml`.
-- Si vous préférez un routage par nom d'hôte (ex. `n8n.sortbook.local`), ajoutez des règles Traefik `Host()` et adaptez votre DNS / fichier `/etc/hosts` sur les clients.
-- Les données persistantes sont liées sur `/data` (sur l'hôte) : évitez de committer ce dossier.
+- n8n : `https://n8n.edoras.local`
+- Windmill : `https://windmill.edoras.local`
+- Flowise : `https://flowise.edoras.local`
+- Dashboard Traefik : `http://edoras.local:8080/dashboard/`
+
+## Dépannage rapide
+
+- 404 sur un service :
+  - vérifier que le conteneur est `Up` (`docker ps`)
+  - vérifier la ligne `hosts` et l’IP
+  - tester en local sur la machine Docker :
+    - `curl -vk https://localhost -H "Host: n8n.edoras.local"`
+
+- Problèmes de cache / HTTPS sur le navigateur :
+  - tester en navigation privée ou avec un autre navigateur.
+*** End Patch

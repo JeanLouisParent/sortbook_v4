@@ -1,0 +1,47 @@
+http:
+  routers:
+    # n8n : https://n8n.edoras.local
+    n8n:
+      entryPoints:
+        - websecure
+      rule: Host(`n8n.edoras.local`)
+      service: n8n-service
+      tls: {}
+
+    # Windmill : https://windmill.edoras.local
+    windmill:
+      entryPoints:
+        - websecure
+      rule: Host(`windmill.edoras.local`)
+      service: windmill-service
+      tls: {}
+
+    # Flowise : https://flowise.edoras.local
+    flowise:
+      entryPoints:
+        - websecure
+      rule: Host(`flowise.edoras.local`)
+      service: flowise-service
+      tls: {}
+
+  services:
+    n8n-service:
+      loadBalancer:
+        servers:
+          - url: http://sortbook_n8n:5678
+
+    windmill-service:
+      loadBalancer:
+        servers:
+          - url: http://sortbook_windmill_server:8000
+
+    flowise-service:
+      loadBalancer:
+        servers:
+          - url: http://sortbook_flowise:3000
+
+tls:
+  certificates:
+    # Cert autosigné unique pour *.edoras.local (géré côté Traefik)
+    - certFile: /etc/traefik/certs/edoras.local.crt
+      keyFile: /etc/traefik/certs/edoras.local.key
