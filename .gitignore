@@ -1,2 +1,4 @@
 /data/
 /.env
+# Traefik certs
+traefik/certs/
